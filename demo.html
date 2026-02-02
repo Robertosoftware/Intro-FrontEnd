@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Lot Chat — Mobile-First Demo</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  /* Visual polish */
+  :root{
+    --bg:#f8fafc;
+    --card:#ffffff;
+    --muted:#64748b;
+    --accent:#6366f1;
+  }
+  body{ background: linear-gradient(180deg,var(--bg),#ffffff); font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
+  .glass { background: rgba(255,255,255,0.6); backdrop-filter: blur(6px); }
+  .dot { width:8px; height:8px; border-radius:9999px; background:#94a3b8; display:inline-block; animation: bounce 0.9s infinite ease-in-out; }
+  .dot.d2{ animation-delay:0.12s; opacity:0.92 } .dot.d3{ animation-delay:0.24s; opacity:0.78 }
+  @keyframes bounce { 0%,80%,100%{ transform: translateY(0); opacity:0.6 } 40%{ transform: translateY(-6px); opacity:1 } }
+  /* smooth message enter */
+  .msg-enter { opacity:0; transform: translateY(8px) scale(.995); }
+  .msg-enter-active { transition: all 200ms cubic-bezier(.2,.9,.2,1); opacity:1; transform:none; }
+  /* bottom sheet */
+  .sheet { transition: transform 240ms cubic-bezier(.2,.9,.2,1); transform: translateY(100%); }
+  .sheet.open { transform: translateY(0%); }
+  /* subtle scrollbar */
+  .scrollbar::-webkit-scrollbar { width:8px; }
+  .scrollbar::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.18); border-radius:9999px; }
+  /* small shadow for bottom sheet handle */
+  .handle { width:36px; height:4px; background:rgba(15,23,42,0.12); border-radius:9999px; margin:6px auto; }
+</style>
+</head>
+<body class="antialiased">
+
+<div class="min-h-screen p-4">
+  <div class="mx-auto max-w-[1200px]">
+    <!-- Header -->
+    <header class="flex items-center justify-between mb-3">
+      <div class="flex items-center gap-3">
+        <button id="toggle-sidebar" aria-label="Toggle sidebar" class="md:hidden p-2 rounded-md bg-white shadow-sm">
+          <!-- hamburger -->
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" class="text-slate-700"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-600 to-sky-500 text-white flex items-center justify-center font-bold shadow">TB</div>
+        <div>
+          <h1 class="text-lg font-semibold">Lot Value Chat</h1>
+          <p class="text-xs text-slate-500">Ask about this lot • Predictions update live</p>
+        </div>
+      </div>
+
+      <div class="hidden md:flex items-center gap-2">
+        <button id="export-btn" class="px-3 py-1.5 rounded-md bg-white text-sm shadow-sm">Export</button>
+        <button id="publish-btn" class="px-3 py-1.5 rounded-md bg-indigo-600 text-white text-sm">Publish</button>
+      </div>
+    </header>
+
+    <!-- Main grid -->
+    <div class="grid grid-cols-12 gap-4">
+      <!-- Sidebar (left) -->
+      <aside id="sidebar" class="col-span-12 md:col-span-3 bg-white rounded-2xl shadow-md p-4 glass md:block hidden">
+        <div class="flex flex-col gap-3">
+          <img src="https://images.unsplash.com/photo-1526178619769-5f4b2f0a2d6f?q=80&w=800&auto=format&fit=crop" alt="Lot image" class="w-full h-36 object-cover rounded-lg shadow-sm" />
+
+          <div class="flex justify-between items-start">
+            <div>
+              <h2 class="text-md font-semibold">Lot #A-1024</h2>
+              <p class="text-xs text-slate-500">Antique Oak Table • early 1900s</p>
+            </div>
+            <div class="text-xs text-slate-400">Cond: <span class="text-slate-700 ml-1">Good</span></div>
+          </div>
+
+          <dl class="grid grid-cols-2 gap-2 text-xs text-slate-600">
+            <div><dt class="text-xs text-slate-400">Catalog</dt><dd>Fall 2026</dd></div>
+            <div><dt class="text-xs text-slate-400">Provenance</dt><dd>Private collection</dd></div>
+            <div><dt class="text-xs text-slate-400">Dims</dt><dd>120×80×75 cm</dd></div>
+            <div><dt class="text-xs text-slate-400">Material</dt><dd>Oak</dd></div>
+          </dl>
+
+          <div class="mt-2 text-sm text-slate-700">
+            <h3 class="text-sm font-medium mb-1">Key features</h3>
+            <ul class="text-xs text-slate-600 space-y-1">
+              <li>• Solid construction</li>
+              <li>• Replaced top (authentic)</li>
+              <li>• Minor finish wear</li>
+            </ul>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Chat panel -->
+      <section class="col-span-12 md:col-span-6 bg-white rounded-2xl shadow-md p-3 flex flex-col h-[72vh] overflow-hidden">
+        <!-- chat header row (mobile) -->
+        <div class="flex items-center justify-between mb-2 md:hidden">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-md bg-slate-100 flex items-center justify-center text-slate-700 font-semibold">💬</div>
+            <div>
+              <div class="text-sm font-medium">Chat</div>
+              <div class="text-xs text-slate-400">Streaming • context kept</div>
+            </div>
+          </div>
+          <button id="open-predict-mobile" class="px-2 py-1 rounded-md bg-indigo-600 text-white text-sm">Value</button>
+        </div>
+
+        <!-- messages list -->
+        <div id="messages" class="flex-1 overflow-auto px-2 py-1 scrollbar" aria-live="polite" aria-atomic="false">
+          <!-- template messages injected by JS -->
+        </div>
+
+        <!-- input area -->
+        <form id="chat-form" class="mt-2 flex items-end gap-2" onsubmit="return false;">
+          <textarea id="input" rows="1" placeholder="Ask about comparables, adjustments, or request a conservative estimate..." class="flex-1 min-h-[44px] max-h-36 resize-none rounded-xl border px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300"></textarea>
+          <button id="send" class="px-4 py-2 rounded-xl bg-indigo-600 text-white shadow-md">Send</button>
+        </form>
+      </section>
+
+      <!-- Predict card -->
+      <aside class="col-span-12 md:col-span-3">
+        <div class="hidden md:block bg-white rounded-2xl shadow-md p-4 h-[72vh] overflow-auto glass">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-xs text-slate-400">Predicted value</div>
+              <div class="text-2xl font-bold text-slate-900">€ <span id="pred-val">3,200</span></div>
+              <div class="text-xs text-slate-400 mt-1">Confidence: <span id="pred-conf">78%</span></div>
+            </div>
+            <div class="text-sm text-emerald-600 font-semibold">Stable</div>
+          </div>
+
+          <div class="mt-3">
+            <svg width="100%" height="48" viewBox="0 0 200 48" preserveAspectRatio="none"><polyline fill="none" stroke="#6366f1" stroke-width="2" points="0,36 30,28 60,24 90,16 120,14 150,12 180,8 200,6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <div class="text-xs text-slate-400 mt-1">Trend (last comps)</div>
+          </div>
+
+          <div class="mt-4 grid grid-cols-2 gap-2">
+            <div class="p-2 border rounded-md text-sm">
+              <div class="text-xs text-slate-400">Start</div>
+              <div class="font-medium">€ 2,400</div>
+            </div>
+            <div class="p-2 border rounded-md text-sm">
+              <div class="text-xs text-slate-400">Reserve</div>
+              <div class="font-medium">€ 2,800</div>
+            </div>
+          </div>
+
+          <div class="mt-4 text-sm text-slate-600 space-y-2">
+            <div><strong>Top comparables</strong></div>
+            <div class="flex items-center justify-between">
+              <div class="text-sm">Lot B-710 • 2024</div>
+              <div class="text-sm font-medium">€ 3,500</div>
+            </div>
+            <div class="flex items-center justify-between">
+              <div class="text-sm">Lot C-512 • 2023</div>
+              <div class="text-sm font-medium">€ 2,900</div>
+            </div>
+          </div>
+
+          <div class="mt-4 flex gap-2">
+            <button id="refresh" class="flex-1 px-3 py-2 rounded-md bg-white border">Recompute</button>
+            <button id="export" class="px-3 py-2 rounded-md bg-indigo-600 text-white">Export</button>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+
+<!-- Mobile bottom-sheet predictive card -->
+<div id="sheet" class="fixed left-0 right-0 bottom-0 z-40 md:hidden">
+  <div id="sheet-backdrop" class="absolute inset-0 bg-black/30 hidden"></div>
+  <div id="sheet-panel" class="sheet bg-white rounded-t-2xl p-4 shadow-lg">
+    <div class="handle"></div>
+    <div class="flex items-center justify-between">
+      <div>
+        <div class="text-xs text-slate-400">Predicted value</div>
+        <div class="text-xl font-bold">€ <span id="sheet-val">3,200</span></div>
+      </div>
+      <button id="sheet-close" class="p-2 rounded-md"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M6 18L18 6" stroke="#111827" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </div>
+    <div class="mt-3 text-sm text-slate-600">
+      <div class="text-xs text-slate-400">Confidence</div>
+      <div class="font-semibold text-emerald-600" id="sheet-conf">78%</div>
+      <div class="mt-3 text-xs text-slate-400">Top comparable: Lot B-710 • €3,500 • 2024</div>
+      <div class="mt-4 flex gap-2">
+        <button id="sheet-refresh" class="flex-1 px-3 py-2 rounded-md bg-white border">Refresh</button>
+        <button id="sheet-export" class="px-3 py-2 rounded-md bg-indigo-600 text-white">Export</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* DEMO LOGIC — Replace with your API integration
+  - Replace simulatePredict() with POST `${backend}/predict`
+  - Replace simulateChatStream() with streaming fetch to `${backend}/chat/stream` and append tokens as they arrive
+*/
+
+// Basic DOM refs
+const messagesEl = document.getElementById('messages');
+const inputEl = document.getElementById('input');
+const sendBtn = document.getElementById('send');
+const predVal = document.getElementById('pred-val');
+const predConf = document.getElementById('pred-conf');
+const sheetVal = document.getElementById('sheet-val');
+const sheetConf = document.getElementById('sheet-conf');
+const toggleSidebar = document.getElementById('toggle-sidebar');
+const sidebar = document.getElementById('sidebar');
+const openPredictMobile = document.getElementById('open-predict-mobile');
+const sheet = document.getElementById('sheet');
+const sheetPanel = document.getElementById('sheet-panel');
+const sheetBackdrop = document.getElementById('sheet-backdrop');
+const sheetClose = document.getElementById('sheet-close');
+const sheetRefresh = document.getElementById('sheet-refresh');
+const refreshBtn = document.getElementById('refresh');
+
+// helpers
+function el(tag, cls=''){ const e=document.createElement(tag); if(cls) e.className=cls; return e; }
+function now(){ return new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }
+function scrollToBottom(){ messagesEl.scrollTop = messagesEl.scrollHeight; }
+
+// message renderers
+function addUserMessage(text){
+  const wrap = el('div','flex gap-3 items-end justify-end msg-enter-active');
+  wrap.innerHTML = `
+    <div class="bg-indigo-600 text-white rounded-xl p-3 max-w-[82%] shadow-md">
+      <div class="text-sm">${escapeHtml(text)}</div>
+      <div class="text-xs text-indigo-100 mt-2 text-right">${now()}</div>
+    </div>
+    <div class="flex-none">
+      <div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-sm shadow-sm">U</div>
+    </div>
+  `;
+  messagesEl.appendChild(wrap);
+  scrollToBottom();
+}
+
+function addAssistantPlaceholder(){
+  const wrap = el('div','flex gap-3 items-start');
+  wrap.innerHTML = `
+    <div class="flex-none">
+      <div class="w-8 h-8 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center text-sm text-slate-700 shadow-sm">A</div>
+    </div>
+    <div class="bg-slate-50 rounded-xl p-3 max-w-[82%] prose prose-sm text-slate-800 shadow-sm border border-slate-100">
+      <div class="text-xs text-slate-400 mb-1">Assistant</div>
+      <div class="assistant-text"></div>
+      <div class="text-xs text-slate-400 mt-2 text-right">${now()}</div>
+    </div>
+  `;
+  messagesEl.appendChild(wrap);
+  scrollToBottom();
+  return wrap.querySelector('.assistant-text');
+}
+
+// streaming simulation (replace with actual stream parsing)
+async function simulateChatStream(prompt){
+  // create assistant placeholder and stream tokens
+  const textEl = addAssistantPlaceholder();
+  // simple simulated response
+  const full = `Predicted value updated. Top comparable: Lot B-710 sold for €3,500 in 2024. Confidence: 78%. Adjustments: -12% condition, +8% provenance. Would you like a detailed breakdown?`;
+  let i = 0;
+  return new Promise(resolve=>{
+    const iv = setInterval(()=>{
+      textEl.innerText += full[i++] ?? '';
+      scrollToBottom();
+      if(i>=full.length){ clearInterval(iv); resolve(); }
+    }, 16);
+  });
+}
+
+// predictive simulation (replace with real POST /predict)
+function simulatePredict(){
+  // immediate UI feedback, then small async jitter
+  const base = 2800 + Math.round(Math.random()*1000);
+  predVal.innerText = base.toLocaleString();
+  predConf.innerText = `${Math.round(60 + Math.random()*30)}%`;
+  sheetVal.innerText = predVal.innerText;
+  sheetConf.innerText = predConf.innerText;
+}
+
+// wire send
+sendBtn.addEventListener('click', async (e)=>{
+  e.preventDefault();
+  const q = inputEl.value.trim();
+  if(!q) return;
+  addUserMessage(q);
+  inputEl.value = '';
+  // optimistically update predict while chat streams (common UX)
+  simulatePredict();
+  // show typing indicator
+  const typing = el('div','flex gap-3 items-start');
+  typing.innerHTML = `
+    <div class="flex-none">
+      <div class="w-8 h-8 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center text-sm text-slate-700 shadow-sm">A</div>
+    </div>
+    <div class="bg-slate-50 rounded-xl p-3 max-w-[82%] shadow-sm border border-slate-100">
+      <div class="text-xs text-slate-400 mb-2">Assistant</div>
+      <div class="flex items-center gap-2"><span class="dot"></span><span class="dot d2"></span><span class="dot d3"></span></div>
+    </div>
+  `;
+  messagesEl.appendChild(typing);
+  scrollToBottom();
+
+  // simulate backend stream
+  await new Promise(r=>setTimeout(r,800)); // small latency
+  typing.remove();
+  await simulateChatStream(q);
+});
+
+// sidebar toggle (mobile)
+toggleSidebar?.addEventListener('click', ()=>{
+  if(sidebar.classList.contains('hidden')) sidebar.classList.remove('hidden');
+  else sidebar.classList.add('hidden');
+});
+
+// bottom-sheet open/close
+openPredictMobile?.addEventListener('click', ()=>{ openSheet(); });
+sheetClose?.addEventListener('click', ()=>{ closeSheet(); });
+sheetBackdrop?.addEventListener('click', ()=>{ closeSheet(); });
+sheetRefresh?.addEventListener('click', ()=>{ simulatePredict(); });
+
+// desktop refresh
+refreshBtn?.addEventListener('click', ()=>{ simulatePredict(); });
+
+// sheet open helpers
+function openSheet(){ sheetPanel.classList.add('open'); sheetBackdrop.classList.remove('hidden'); sheetBackdrop.style.display='block'; }
+function closeSheet(){ sheetPanel.classList.remove('open'); sheetBackdrop.classList.add('hidden'); sheetBackdrop.style.display='none'; }
+
+// small keyboard helper: send on CMD/CTRL+Enter
+inputEl.addEventListener('keydown', (e)=>{
+  if((e.ctrlKey || e.metaKey) && e.key === 'Enter') { sendBtn.click(); }
+});
+
+// initial demo seed messages
+(function seed(){
+  const intro = "The model suggests a baseline estimate. Ask for adjustments (e.g., change condition to 'Excellent') or request a comps CSV.";
+  const span = el('div','flex gap-3 items-start');
+  span.innerHTML = `
+    <div class="flex-none">
+      <div class="w-8 h-8 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center text-sm text-slate-700 shadow-sm">A</div>
+    </div>
+    <div class="bg-slate-50 rounded-xl p-3 max-w-[82%] prose prose-sm text-slate-800 shadow-sm border border-slate-100">
+      <div class="text-xs text-slate-400 mb-1">Assistant</div>
+      <div>${intro}</div>
+      <div class="text-xs text-slate-400 mt-2 text-right">${now()}</div>
+    </div>
+  `;
+  messagesEl.appendChild(span);
+  // initial predict
+  simulatePredict();
+})();
+
+function escapeHtml(str){ return str.replace(/[&<>"']/g, (m)=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[m]); }
+</script>
+</body>
+</html>

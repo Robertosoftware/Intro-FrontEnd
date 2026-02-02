@@ -29,7 +29,8 @@ class Solution:
                 return[seen[remaining],i]
             seen[v]=i
         return[]
-        
+    
+
                 
 s= Solution()
 print(s.twoSum(nums=nums, target=target))
